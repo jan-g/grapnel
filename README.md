@@ -14,7 +14,7 @@ ssh server running inside the function.
 By continually invoking the function, the shell can be kept alive and active.
 
 (This is based upon an idea demoed in a [talk](https://www.meetup.com/bristech/events/251644716/)
-for the local ["Bris-Tech"](https://bris.tech) group given in July 2018.)
+for the local ["Bris-Tech"](http://bris.tech) group given in July 2018.)
 
 ## Using the grapnel
 
