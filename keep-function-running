@@ -1,0 +1,28 @@
+#!/bin/sh
+set -e
+
+APP="grapnel"
+FN="grapnel"
+
+while getopts "a:f:" opt; do
+  case ${opt} in
+    a) APP="$OPTARG" ;;
+    f) FN="$OPTARG" ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+die() {
+  echo "$@" 1>&2
+  exit 1
+}
+
+
+trap "exit 1" INT TERM
+
+while :; do
+  echo '{"name":"world","sleep":2,"file":"/tmp/env","shell":"ps -ef"}' |
+    fn invoke "$APP" "$FN" |
+    jq -r '(.bytes|@base64d) + "\n\n" + (.stdout|@base64d) + "\n\n" + (.stderr|@base64d)'
+done
+

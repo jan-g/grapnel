@@ -1,0 +1,15 @@
+#!/bin/sh
+(
+exec >/tmp/env 2>&1
+
+chmod 0700 /tmp
+mkdir -p /tmp/run/sshd
+mkdir -p /tmp/etc/dropbear
+dropbear -R -E -s -p 9999
+mkdir -p ~/.ssh
+printenv remote_priv | base64 -d > ~/.ssh/id_rsa
+printenv local_pub | base64 -d > ~/.ssh/authorized_keys
+chmod -R go-rwx ~/.ssh
+ps -ef | ssh -v -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /tmp/.ssh/id_rsa -R9999:localhost:9999 "$remote_user"@"$remote_ip" "cat > /tmp/itsme; sleep infinity"
+) &
+exec ./func

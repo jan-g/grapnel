@@ -1,0 +1,73 @@
+#!/bin/sh
+set -e
+
+APP="grapnel"
+FN="grapnel"
+SUBNET=""
+REMOTE_HOST=""
+REMOTE_USER="opc"
+
+while getopts "a:f:s:h:u:" opt; do
+  case ${opt} in
+    a) APP="$OPTARG" ;;
+    f) FN="$OPTARG" ;;
+    s) SUBNET="$OPTARG" ;;
+    h) REMOTE_HOST="$OPTARG" ;;
+    u) REMOTE_USER="$OPTARG" ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+die() {
+  echo "$@" 1>&2
+  exit 1
+}
+
+[[ -z "$REMOTE_HOST" ]] && die "Please specify the target host address with -h REMOTE_HOST"
+
+
+# Create the host keys
+[[ -f h_to_f ]] || ssh-keygen -t rsa -f h_to_f -N "" -C "host-to-function"
+[[ -f f_to_h ]] || ssh-keygen -t rsa -f f_to_h -N "" -C "function-to-host"
+echo "Host keys created. DO NOT USE THESE ANYWHERE ELSE"
+
+echo "Add the following 'authorized_keys' entry to the user $REMOTE_USER on the launch host $REMOTE_HOST"
+cat f_to_h.pub
+
+
+# Annotation for OCI serverless
+fn create app $APP \
+  --annotation oracle.com/oci/subnetIds='["'"$SUBNET"'"]'
+
+[[ -f func.yaml ]] || fn init --name "$FN" --runtime docker
+fn --verbose deploy --app "$APP"
+
+
+# Configure the function.
+if [[ "$(uname)" != Darwin ]]; then
+  base64() {
+    command base64 -w 0 "$@"
+  }
+fi
+  
+fn config function "$APP" "$FN" remote_ip "$REMOTE_HOST"
+fn config function "$APP" "$FN" remote_user "$REMOTE_USER"
+fn config function "$APP" "$FN" local_pub "$(base64 h_to_f.pub)"
+fn config function "$APP" "$FN" remote_priv "$(base64 f_to_h)" | sed -e 's/ with .*$/ with *REDACTED*/'
+
+
+cat <<-EOF
+	Function configured. WARNING: its configuration contains a private key without passphrase!
+
+	Complete the configuration as follows:
+	1. On the target host $REMOTE_HOST, add the ~/.ssh/authorized_keys entry to user $REMOTE_USER:
+	$(cat f_to_h.pub)
+
+	2. Copy the private key associated with the function to $REMOTE_HOST.
+	   This is in the file h_to_f
+
+	2. Use ./keep-function-running to keep the shell open and active.
+
+	3. On $REMOTE_HOST, wait for a listening socket on localhost:9999 to appear, then:
+	ssh -v -p 9999 -i h_to_f -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@localhost
+	EOF
