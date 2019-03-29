@@ -31,6 +31,8 @@ Add the generated public key to that host, together with the private key used
 to authenticate the connection in the other direction:
 
     scp f_to_h.pub h_to_f opc@jumphost
+    ssh opc@jumphost sh -c 'cat f_to_h.pub >> ~/.ssh/authorized_keys'
+    # When someone tells you to do something like this, be certain you understand the implications!
 
 Run the loop to keep the function active.
 
